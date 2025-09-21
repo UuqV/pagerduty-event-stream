@@ -36,7 +36,7 @@ func SendPagerDutyAlert(summary string) error {
 func PreparePagerDutyAlert(summary string) ([]byte, error) {
 	routingKey := os.Getenv("PAGERDUTY_ROUTING_KEY")
 	if routingKey == "" {
-		LogPagerDutyAlert(summary)
+		return nil, fmt.Errorf("Pagerduty is not set up")
 	}
 
 	event := PagerDutyEvent{
@@ -65,8 +65,4 @@ func DispatchPagerDutyAlert(data []byte) error {
 		return fmt.Errorf("pagerduty returned status %d", resp.StatusCode)
 	}
 	return nil
-}
-
-func LogPagerDutyAlert(summary string) {
-	fmt.Println(summary)
 }
