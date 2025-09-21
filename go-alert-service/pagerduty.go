@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"net/http"
 )
 
@@ -27,16 +28,15 @@ func SendPagerDutyAlert(summary string) error {
 	if err != nil {
 		return err
 	}
-	SendPagerDutyAlert(alert)
+	DispatchPagerDutyAlert(alert)
 
 	return nil
 }
 
-PreparePagerDutyAlert(summary string) ([]byte, error) {
-
+func PreparePagerDutyAlert(summary string) ([]byte, error) {
 	routingKey := os.Getenv("PAGERDUTY_ROUTING_KEY")
 	if routingKey == "" {
-		logPagerDutyAlert(summary)
+		LogPagerDutyAlert(summary)
 	}
 
 	event := PagerDutyEvent{
@@ -49,11 +49,12 @@ PreparePagerDutyAlert(summary string) ([]byte, error) {
 
 	data, err := json.Marshal(event)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	return data, nil
 }
 
-DispatchPagerDutyAlert(data []byte) error {
+func DispatchPagerDutyAlert(data []byte) error {
 	resp, err := http.Post(pagerDutyURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return err
@@ -63,8 +64,9 @@ DispatchPagerDutyAlert(data []byte) error {
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("pagerduty returned status %d", resp.StatusCode)
 	}
+	return nil
 }
 
-LogPagerDutyAlert(summary string) error {
-	fmt.Println(data)
+func LogPagerDutyAlert(summary string) {
+	fmt.Println(summary)
 }
