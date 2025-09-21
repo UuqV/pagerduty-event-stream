@@ -21,7 +21,24 @@ type PagerDutyEvent struct {
 }
 
 // SendPagerDutyAlert sends a trigger event to PagerDuty
-func SendPagerDutyAlert(routingKey, summary string) error {
+func SendPagerDutyAlert(summary string) error {
+
+	alert, err := PreparePagerDutyAlert(summary)
+	if err != nil {
+		return err
+	}
+	SendPagerDutyAlert(alert)
+
+	return nil
+}
+
+PreparePagerDutyAlert(summary string) ([]byte, error) {
+
+	routingKey := os.Getenv("PAGERDUTY_ROUTING_KEY")
+	if routingKey == "" {
+		logPagerDutyAlert(summary)
+	}
+
 	event := PagerDutyEvent{
 		RoutingKey:  routingKey,
 		EventAction: "trigger",
@@ -34,7 +51,9 @@ func SendPagerDutyAlert(routingKey, summary string) error {
 	if err != nil {
 		return err
 	}
+}
 
+DispatchPagerDutyAlert(data []byte) error {
 	resp, err := http.Post(pagerDutyURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return err
@@ -44,5 +63,8 @@ func SendPagerDutyAlert(routingKey, summary string) error {
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("pagerduty returned status %d", resp.StatusCode)
 	}
-	return nil
+}
+
+LogPagerDutyAlert(summary string) error {
+	fmt.Println(data)
 }

@@ -12,10 +12,6 @@ import (
 )
 
 func main() {
-	routingKey := os.Getenv("PAGERDUTY_ROUTING_KEY")
-	if routingKey == "" {
-		log.Fatal("PAGERDUTY_ROUTING_KEY env var is required")
-	}
 
 	// Kafka consumer config
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
@@ -60,7 +56,7 @@ func main() {
 			alert := string(msg.Value)
 			fmt.Printf("Received alert: %s\n", alert)
 
-			if err := SendPagerDutyAlert(routingKey, alert); err != nil {
+			if err := SendPagerDutyAlert(alert); err != nil {
 				log.Printf("failed to send PagerDuty alert: %v", err)
 			} else {
 				log.Printf("Alert sent to PagerDuty: %s", alert)
