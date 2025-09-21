@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build statically linked binary
-RUN go build -o alert-service main.go
+RUN go build -o alert-service main.go pagerduty.go
 
 # ----------- Runtime stage -----------
 FROM debian:bookworm-slim
