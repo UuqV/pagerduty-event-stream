@@ -49,8 +49,8 @@ volumes:
 Recreate the containers so Flink sees it:
 
 ```bash
-docker compose down
-docker compose up -d
+docker compose down <jobmanager-container>
+docker compose up -d <jobmanager-container>
 ```
 
 Your JAR will be available at:
