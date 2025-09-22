@@ -8,7 +8,7 @@ lazy val root = (project in file("."))
     name := "flink-job",
 
     // Entry point for Flink
-    Compile / mainClass := Some("com.example.ErrorPatternJob"),
+    Compile / mainClass := Some("com.example.MissingEventJob"),
 
 libraryDependencies ++= Seq(
   // Flink core Scala API modules
@@ -41,4 +41,4 @@ libraryDependencies ++= Seq(
     }
   )
 
-Compile / mainClass := Some("com.example.ErrorPatternJob")
+Compile / mainClass := Some("com.example.MissingEventJob")
