@@ -1,30 +1,111 @@
-### PagerDuty Event Stream
+Event Signals with Flink + Kafka
 
-This repository provides a docker composition to stream events, aggregate them, and send meaningful alerts to PagerDuty (or any other client API). It leverages Apache Kafka for the event stream and Apache Flink for aggregation.
+This project demonstrates a simple real-time stream processing pipeline using Apache Flink and Apache Kafka.
+Events are written to a Kafka topic (events), processed by a Flink job, and published to another Kafka topic (alerts).
 
-### Getting Started
+Initially, the Flink job just passes through events (with debug logs). Later, you can add pattern detection (CEP) for complex alerting logic.
 
-```
-docker compose up
-```
+Prerequisites
 
-### Sending events
-```
- kafka-console-producer --bootstrap-server localhost:9092 --topic events
-```
+Docker + Docker Compose installed
+
+Java 8+ installed locally (for compiling Scala)
+
+sbt (Scala Build Tool) installed locally
+
+Project Structure
+.
+├── docker-compose.yml        # Kafka, Zookeeper, Flink JobManager/TaskManager
+├── flink-job/
+│   ├── build.sbt             # Flink + Kafka dependencies
+│   └── src/main/scala/com/example/ErrorPatternJob.scala
+
+Setup
+1. Start Infrastructure (Kafka + Flink)
+docker compose up -d
 
 
-### Deploying an aggregator job
+This starts:
 
-Aggregator jobs are deployed via Apache Flink and can be found in the `flink-job` folder. To compile it you will need `sbt` and `java`.
+Zookeeper
 
-```
-cd flink-job
-sbt assembly
-```
+Kafka Broker (reachable at localhost:9092)
 
-To deploy it to a running flink docker image:
+Flink JobManager (http://localhost:8081)
 
-```
-docker exec -it event_signals-flink-jobmanager-1 flink run /opt/flink/usrlib/flink-job-assembly-0.1.0-SNAPSHOT.jar
-```
+Flink TaskManager(s)
+
+2. Build the Flink Job JAR
+
+From inside the flink-job/ folder:
+
+sbt clean assembly
+
+
+This produces:
+
+target/scala-2.12/flink-job-assembly-0.1.0-SNAPSHOT.jar
+
+3. Copy JAR into Flink
+
+In docker-compose.yml, we mount the compiled JAR into Flink:
+
+volumes:
+  - ./target/scala-2.12:/opt/flink/usrlib
+
+
+Recreate the containers so Flink sees it:
+
+docker compose down
+docker compose up -d
+
+
+Your JAR will be available at:
+
+/opt/flink/usrlib/flink-job-assembly-0.1.0-SNAPSHOT.jar
+
+4. Submit the Job
+
+Run inside the JobManager container:
+
+docker exec -it <jobmanager-container> \
+  flink run /opt/flink/usrlib/flink-job-assembly-0.1.0-SNAPSHOT.jar
+
+
+Check the Flink UI: http://localhost:8081
+
+Flink Job Logic
+Current (Passthrough)
+
+The provided job simply:
+
+Consumes messages from Kafka topic events
+
+Logs them to stdout (DEBUG-INCOMING)
+
+Produces them unchanged to Kafka topic alerts
+
+src/main/scala/com/example/ErrorPatternJob.scala:
+
+val consumer = new FlinkKafkaConsumer[String]("events", new SimpleStringSchema(), props)
+val stream = env.addSource(consumer).assignTimestampsAndWatermarks(WatermarkStrategy.noWatermarks())
+
+stream.print("DEBUG-INCOMING")
+
+val producer = new FlinkKafkaProducer[String]("alerts", new SimpleStringSchema(), props)
+stream.addSink(producer)
+
+Testing
+1. Write test events
+docker exec -it <kafka-container> \
+  kafka-console-producer --broker-list kafka:9092 --topic events
+
+
+Type some messages and hit Enter.
+
+2. Read alerts
+docker exec -it <kafka-container> \
+  kafka-console-consumer --bootstrap-server kafka:9092 --topic alerts --from-beginning
+
+
+You should see the same messages appear, confirming the pipeline works.
