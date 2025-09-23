@@ -1,5 +1,5 @@
-from pyflink.datastream import StreamExecutionEnvironment, TimeCharacteristic
-from pyflink.datastream.connectors.kafka import KafkaSource
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.datastream.connectors.kafka import KafkaSource, KafkaSink, KafkaRecordSerializationSchema
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.watermark_strategy import WatermarkStrategy
 from pyflink.datastream import KeyedProcessFunction
@@ -10,11 +10,7 @@ import time
 
 
 def extract_event_time(event: str) -> int:
-    """
-    Extracts event timestamp in epoch millis.
-    Assumes event is JSON with a 'ts' field (in millis).
-    Fallback = current system time.
-    """
+    """Extracts event timestamp in epoch millis."""
     try:
         data = json.loads(event)
         return int(data.get("ts", int(time.time() * 1000)))
@@ -23,6 +19,7 @@ def extract_event_time(event: str) -> int:
 
 
 class MissingEventDetector(KeyedProcessFunction):
+    THRESHOLD_MS = 30_000  # 30 seconds
 
     def open(self, runtime_context):
         desc = ValueStateDescriptor("timestamp", Types.LONG())
@@ -30,27 +27,27 @@ class MissingEventDetector(KeyedProcessFunction):
 
     def process_element(self, value, ctx: 'KeyedProcessFunction.Context'):
         ts = ctx.timestamp()
-        last_seen = self.last_seen_state.value()
-
-        # Update last seen
         self.last_seen_state.update(ts)
 
-        # Register a timer for 10s after this event’s timestamp
-        ctx.timer_service().register_event_time_timer(ts + 10_000)
-
-        yield f"Received event at {ts}, last seen={last_seen}"
+        # Register a timer 30s after this event’s timestamp
+        ctx.timer_service().register_event_time_timer(ts + self.THRESHOLD_MS)
 
     def on_timer(self, timestamp, ctx: 'KeyedProcessFunction.OnTimerContext'):
         last_seen = self.last_seen_state.value()
-        if last_seen is None or timestamp > last_seen + 10_000:
-            yield f"⚠️ Missing event detected for key={ctx.get_current_key()} at {timestamp}"
+        if last_seen is None or timestamp > last_seen + self.THRESHOLD_MS:
+            alert = json.dumps({
+                "key": ctx.get_current_key(),
+                "alert": "missing_event",
+                "last_seen": last_seen,
+                "detected_at": timestamp
+            })
+            yield alert
 
 
 def main():
     env = StreamExecutionEnvironment.get_execution_environment()
     env.set_parallelism(1)
 
-    # Configure watermark strategy (5s out-of-order allowed)
     watermark_strategy = (
         WatermarkStrategy
         .for_bounded_out_of_orderness(Duration.of_seconds(5))
@@ -66,22 +63,35 @@ def main():
         .build()
     )
 
-    # Add source with watermarks
+    sink = (
+        KafkaSink.builder()
+        .set_bootstrap_servers("kafka:9092")
+        .set_record_serializer(
+            KafkaRecordSerializationSchema.builder()
+            .set_topic("alerts")
+            .set_value_serialization_schema(SimpleStringSchema())
+            .build()
+        )
+        .build()
+    )
+
+    # Read events with watermarks
     event_stream = env.from_source(
         source,
         watermark_strategy,
         "Kafka Source"
     )
 
-    # Key by some field (here everything into 1 key)
+    # Key all events to one group
     keyed = event_stream.key_by(lambda e: "all")
 
-    # Apply missing-event detection
-    processed = keyed.process(MissingEventDetector())
+    # Detect missing events → alerts
+    alerts = keyed.process(MissingEventDetector())
 
-    processed.print()
+    # Send alerts to Kafka
+    alerts.sink_to(sink)
 
-    env.execute("Missing Event Detector with Watermarks")
+    env.execute("Missing Event Detector with Alerts")
 
 
 if __name__ == "__main__":
