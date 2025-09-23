@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -59,13 +60,23 @@ func RunProducer(brokers, topic string) {
 		}
 	}()
 
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
+	rand.Seed(time.Now().UnixNano())
 
 	for {
+		// Base interval 30s
+		base := 30 * time.Second
+
+		// Add jitter in [-10s, +10s]
+		// With a 10s range, ~70% will be within ±5s of 30s,
+		// so ~30% will land outside and "fail"
+		jitter := time.Duration(rand.Intn(21)-10) * time.Second
+		interval := base + jitter
+
+		time.Sleep(interval)
+
 		if err := ProduceEvent(p, topic, "heartbeat", "service is alive"); err != nil {
 			log.Printf("Failed to send event: %v", err)
 		}
-		<-ticker.C
 	}
+
 }

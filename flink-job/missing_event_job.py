@@ -33,9 +33,6 @@ class MissingEventDetector(KeyedProcessFunction):
         # Register a processing-time timer for now + threshold
         ctx.timer_service().register_processing_time_timer(now + self.THRESHOLD_MS)
 
-        # Forward the event downstream if you want; here we yield it
-        yield value
-
     def on_timer(self, timestamp, ctx: 'KeyedProcessFunction.OnTimerContext'):
         last_seen = self.last_seen_state.value()
         if last_seen is None or timestamp >= last_seen + self.THRESHOLD_MS:
