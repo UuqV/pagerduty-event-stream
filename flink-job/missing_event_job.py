@@ -2,7 +2,7 @@ from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import KafkaSource, KafkaSink, KafkaRecordSerializationSchema
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.watermark_strategy import WatermarkStrategy
-from pyflink.datastream import KeyedProcessFunction
+from pyflink.datastream.functions import KeyedProcessFunction
 from pyflink.datastream.state import ValueStateDescriptor
 from pyflink.common import Duration, Types
 import json
@@ -22,19 +22,23 @@ class MissingEventDetector(KeyedProcessFunction):
     THRESHOLD_MS = 30_000  # 30 seconds
 
     def open(self, runtime_context):
-        desc = ValueStateDescriptor("timestamp", Types.LONG())
+        desc = ValueStateDescriptor("last_seen", Types.LONG())
         self.last_seen_state = runtime_context.get_state(desc)
 
     def process_element(self, value, ctx: 'KeyedProcessFunction.Context'):
-        ts = ctx.timestamp()
-        self.last_seen_state.update(ts)
+        # Use processing time
+        now = ctx.timer_service().current_processing_time()
+        self.last_seen_state.update(now)
 
-        # Register a timer 30s after this event’s timestamp
-        ctx.timer_service().register_event_time_timer(ts + self.THRESHOLD_MS)
+        # Register a processing-time timer for now + threshold
+        ctx.timer_service().register_processing_time_timer(now + self.THRESHOLD_MS)
+
+        # Forward the event downstream if you want; here we yield it
+        yield value
 
     def on_timer(self, timestamp, ctx: 'KeyedProcessFunction.OnTimerContext'):
         last_seen = self.last_seen_state.value()
-        if last_seen is None or timestamp > last_seen + self.THRESHOLD_MS:
+        if last_seen is None or timestamp >= last_seen + self.THRESHOLD_MS:
             alert = json.dumps({
                 "key": ctx.get_current_key(),
                 "alert": "missing_event",
@@ -75,20 +79,16 @@ def main():
         .build()
     )
 
-    # Read events with watermarks
     event_stream = env.from_source(
         source,
         watermark_strategy,
         "Kafka Source"
     )
 
-    # Key all events to one group
     keyed = event_stream.key_by(lambda e: "all")
 
-    # Detect missing events → alerts
-    alerts = keyed.process(MissingEventDetector())
+    alerts = keyed.process(MissingEventDetector(), output_type=Types.STRING())
 
-    # Send alerts to Kafka
     alerts.sink_to(sink)
 
     env.execute("Missing Event Detector with Alerts")
