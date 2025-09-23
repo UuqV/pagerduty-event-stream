@@ -41,6 +41,10 @@ func main() {
 		cancel()
 	}()
 
+	fmt.Println("Starting event producer...")
+
+	go RunProducer("kafka:9092", "events")
+
 	fmt.Println("Listening for alerts on Kafka...")
 
 	for {
