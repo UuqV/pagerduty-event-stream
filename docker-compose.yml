@@ -35,12 +35,13 @@ services:
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
   flink-jobmanager:
-    image: flink:1.20
+    image: my-flink-py:1.19.0
     command: jobmanager
-    volumes:
-      - ./flink-job/target/scala-2.12:/opt/flink/usrlib
     ports:
       - "8081:8081"
+    volumes:
+      - ./flink-job:/opt/pyflink/jobs
+      - ./jars:/opt/flink/usrlib
     environment:
       - |
         FLINK_PROPERTIES=
@@ -49,16 +50,27 @@ services:
       - kafka
 
   flink-taskmanager:
-    image: flink:1.20
+    image: my-flink-py:1.19.0
     command: taskmanager
-    scale: 1
     environment:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 2
+    volumes:
+      - ./flink-job:/opt/pyflink/jobs
+      - ./jars:/opt/flink/usrlib
     depends_on:
       - flink-jobmanager
+
+  submit-job:
+    image: my-flink-py:1.19.0
+    depends_on:
+      - flink-jobmanager
+    volumes:
+      - ./flink-job:/opt/pyflink/jobs
+      - ./jars:/opt/flink/usrlib
+    entrypoint: [ "/bin/bash", "-c", "/opt/flink/bin/flink run -m http://flink-jobmanager:8081 -py /opt/pyflink/jobs/missing_event_job.py --jarfile /opt/flink/usrlib/flink-sql-connector-kafka-3.2.0-1.19.jar" ]
 
   go-alert-service:
     build: ./go-alert-service
