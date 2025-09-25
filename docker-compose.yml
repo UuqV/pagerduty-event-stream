@@ -79,3 +79,45 @@ services:
     environment:
       PAGERDUTY_ROUTING_KEY: ${PAGERDUTY_ROUTING_KEY}
     restart: on-failure
+
+  pinot-controller:
+    image: apachepinot/pinot:latest
+    container_name: pinot-controller
+    command: "StartController -zkAddress zookeeper:2181"
+    ports:
+      - "9000:9000" # Pinot Controller UI
+    environment:
+      JAVA_OPTS: "-Xms512M -Xmx512M"
+    depends_on:
+      - zookeeper
+
+  pinot-broker:
+    image: apachepinot/pinot:latest
+    container_name: pinot-broker
+    command: "StartBroker -zkAddress zookeeper:2181"
+    ports:
+      - "8099:8099" # Broker query port
+    environment:
+      JAVA_OPTS: "-Xms512M -Xmx512M"
+    depends_on:
+      - pinot-controller
+
+  pinot-server:
+    image: apachepinot/pinot:latest
+    container_name: pinot-server
+    command: "StartServer -zkAddress zookeeper:2181"
+    ports:
+      - "8098:8098" # Server admin port
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx1G"
+    depends_on:
+      - pinot-broker
+
+  pinot-minion:
+    image: apachepinot/pinot:latest
+    container_name: pinot-minion
+    command: "StartMinion -zkAddress zookeeper:2181"
+    environment:
+      JAVA_OPTS: "-Xms512M -Xmx512M"
+    depends_on:
+      - pinot-controller
