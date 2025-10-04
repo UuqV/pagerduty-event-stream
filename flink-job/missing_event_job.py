@@ -19,7 +19,7 @@ def extract_event_time(event: str) -> int:
 
 
 class MissingEventDetector(KeyedProcessFunction):
-    THRESHOLD_MS = 30_000  # 30 seconds
+    THRESHOLD_MS = 30  # 30 milliseconds
 
     def open(self, runtime_context):
         desc = ValueStateDescriptor("last_seen", Types.LONG())
@@ -39,8 +39,7 @@ class MissingEventDetector(KeyedProcessFunction):
             alert = json.dumps({
                 "key": ctx.get_current_key(),
                 "alert": "missing_event",
-                "last_seen": last_seen,
-                "detected_at": timestamp
+                "timestamp": timestamp
             })
             yield alert
 

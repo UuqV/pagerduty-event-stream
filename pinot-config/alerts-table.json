@@ -1,0 +1,25 @@
+{
+    "tableName": "alerts",
+    "tableType": "REALTIME",
+    "segmentsConfig": {
+        "timeColumnName": "timestamp",
+        "timeType": "MILLISECONDS",
+        "retentionTimeUnit": "DAYS",
+        "retentionTimeValue": "30"
+    },
+    "tableIndexConfig": {
+        "loadMode": "MMAP",
+        "streamConfigs": {
+            "streamType": "kafka",
+            "stream.kafka.consumer.type": "lowlevel",
+            "stream.kafka.topic.name": "alerts",
+            "stream.kafka.broker.list": "kafka:9092",
+            "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+            "realtime.segment.flush.threshold.rows": "10000"
+        }
+    },
+    "tenants": {
+        "broker": "DefaultTenant",
+        "server": "DefaultTenant"
+    }
+}

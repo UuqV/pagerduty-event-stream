@@ -1,0 +1,22 @@
+{
+    "schemaName": "alerts",
+    "dimensionFieldSpecs": [
+        {
+            "name": "key",
+            "dataType": "STRING"
+        },
+        {
+            "name": "alert",
+            "dataType": "STRING"
+        }
+    ],
+    "metricFieldSpecs": [],
+    "dateTimeFieldSpecs": [
+        {
+            "name": "timestamp",
+            "dataType": "LONG",
+            "format": "1:MILLISECONDS:EPOCH",
+            "granularity": "1:MILLISECONDS"
+        }
+    ]
+}

@@ -83,11 +83,15 @@ services:
   pinot-controller:
     image: apachepinot/pinot:latest
     container_name: pinot-controller
+    hostname: pinot
     command: "StartController -zkAddress zookeeper:2181"
     ports:
       - "9000:9000" # Pinot Controller UI
     environment:
       JAVA_OPTS: "-Xms512M -Xmx512M"
+    volumes:
+      - ./pinot-config:/config
+      - ./log4j2.properties:/opt/pinot/conf/controller/log4j2.properties
     depends_on:
       - zookeeper
 

@@ -13,7 +13,7 @@ import (
 type Event struct {
 	Type      string `json:"type"`
 	Message   string `json:"message"`
-	Timestamp string `json:"timestamp"` // RFC3339 formatted
+	Timestamp int64  `json:"timestamp"` // RFC3339 formatted
 }
 
 // ProduceEvent creates an event with a timestamp and sends it to Kafka
@@ -21,7 +21,7 @@ func ProduceEvent(p *kafka.Producer, topic, eventType, message string) error {
 	event := Event{
 		Type:      eventType,
 		Message:   message,
-		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+		Timestamp: time.Now().UTC().UnixMilli(),
 	}
 
 	value, err := json.Marshal(event)
@@ -53,8 +53,6 @@ func RunProducer(brokers, topic string) {
 			case *kafka.Message:
 				if ev.TopicPartition.Error != nil {
 					log.Printf("Delivery failed: %v", ev.TopicPartition.Error)
-				} else {
-					log.Printf("Delivered to %v", ev.TopicPartition)
 				}
 			}
 		}
@@ -63,13 +61,13 @@ func RunProducer(brokers, topic string) {
 	rand.Seed(time.Now().UnixNano())
 
 	for {
-		// Base interval 30s
-		base := 30 * time.Second
+		// Base interval 30ms
+		base := 30 * time.Millisecond
 
 		// Add jitter in [-10s, +10s]
-		// With a 10s range, ~70% will be within ±5s of 30s,
+		// With a 10s range, ~70% will be within ±5s of 30ms,
 		// so ~30% will land outside and "fail"
-		jitter := time.Duration(rand.Intn(21)-10) * time.Second
+		jitter := time.Duration(rand.Intn(21)-10) * time.Millisecond
 		interval := base + jitter
 
 		time.Sleep(interval)

@@ -1,0 +1,25 @@
+{
+    "schemaName": "events",
+    "dimensionFieldSpecs": [
+        {
+            "name": "type",
+            "dataType": "STRING",
+            "defaultNullValue": ""
+        },
+        {
+            "name": "message",
+            "dataType": "STRING",
+            "defaultNullValue": ""
+        }
+    ],
+    "metricFieldSpecs": [],
+    "dateTimeFieldSpecs": [
+        {
+            "name": "timestamp",
+            "dataType": "LONG",
+            "format": "1:MILLISECONDS:EPOCH",
+            "defaultNullValue": -1,
+            "granularity": "1:MILLISECONDS"
+        }
+    ]
+}
