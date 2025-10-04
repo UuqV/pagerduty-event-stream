@@ -23,12 +23,16 @@ class MissingEventDetector(KeyedProcessFunction):
 
     def open(self, runtime_context):
         desc = ValueStateDescriptor("last_seen", Types.LONG())
+        count = ValueStateDescriptor("count", Types.LONG())
         self.last_seen_state = runtime_context.get_state(desc)
+        self.count = runtime_context.get_state(count)
 
     def process_element(self, value, ctx: 'KeyedProcessFunction.Context'):
         # Use processing time
         now = ctx.timer_service().current_processing_time()
         self.last_seen_state.update(now)
+        current_count = self.count.value() or 0
+        self.count.update(current_count + 1)
 
         # Register a processing-time timer for now + threshold
         ctx.timer_service().register_processing_time_timer(now + self.THRESHOLD_MS)
@@ -38,9 +42,10 @@ class MissingEventDetector(KeyedProcessFunction):
         if last_seen is None or timestamp >= last_seen + self.THRESHOLD_MS:
             alert = json.dumps({
                 "key": ctx.get_current_key(),
-                "alert": "missing_event",
+                "alert": f"missing_event, count: {self.count.value()}",
                 "timestamp": timestamp
             })
+            self.count.update(0)
             yield alert
 
 
